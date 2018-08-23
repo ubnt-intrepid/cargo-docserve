@@ -13,8 +13,10 @@ extern crate structopt;
 use cargo::core::compiler::CompileMode;
 use cargo::ops::Packages;
 use cargo::util::Config;
+use cargo_docserve::DocserveOptions;
 
 use failure::Fallible;
+use std::net::IpAddr;
 use std::path::PathBuf;
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
@@ -84,6 +86,14 @@ struct CliOptions {
     #[structopt(short = "w", long = "watch")]
     /// Watch the changes in src/
     watch: bool,
+
+    #[structopt(long = "host", value_name = "HOST", default_value = "127.0.0.1")]
+    /// Host of listener address
+    host: IpAddr,
+
+    #[structopt(long = "port", value_name = "PORT", default_value = "8000")]
+    /// Port number of listener address
+    port: u16,
 }
 
 fn main() -> Fallible<()> {
@@ -111,7 +121,14 @@ fn main() -> Fallible<()> {
         &opts.unstable_flags[..],
     )?;
 
-    cargo_docserve::run(&config, mode, spec, opts.watch)?;
+    let opts = DocserveOptions {
+        config,
+        mode,
+        spec,
+        addr: (opts.host, opts.port).into(),
+        watch: opts.watch,
+    };
+    cargo_docserve::run(opts)?;
 
     Ok(())
 }

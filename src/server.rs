@@ -17,27 +17,27 @@ use tokio::fs::File;
 use tokio::io::read_to_end;
 use tokio::prelude::{future, Future};
 
-#[derive(Debug, Template)]
-#[template(path = "index.html")]
-struct TargetsTemplate<'a> {
-    targets: &'a [Target],
+#[derive(Debug)]
+pub struct ServerConfig {
+    pub doc_dir: PathBuf,
+    pub targets: Vec<Target>,
 }
 
 #[derive(Debug)]
-struct ServiceContext {
-    inner: Arc<Inner>,
+struct FsService {
+    config: Arc<ServerConfig>,
 }
 
-#[derive(Debug)]
-struct Inner {
-    doc_dir: PathBuf,
-    targets: Vec<Target>,
-}
-
-impl ServiceContext {
+impl FsService {
     fn render_index(&self) -> Response<Body> {
+        #[derive(Debug, Template)]
+        #[template(path = "index.html")]
+        struct TargetsTemplate<'a> {
+            targets: &'a [Target],
+        }
+
         let t = TargetsTemplate {
-            targets: &self.inner.targets,
+            targets: &self.config.targets,
         };
         let rendered = t.render().unwrap();
         Response::builder()
@@ -47,7 +47,7 @@ impl ServiceContext {
     }
 
     fn resolve_path(&self, path: &str) -> PathBuf {
-        let mut path = self.inner.doc_dir.join(path.trim_left_matches('/'));
+        let mut path = self.config.doc_dir.join(path.trim_left_matches('/'));
         if path.is_dir() {
             path.push("index.html");
         }
@@ -55,7 +55,7 @@ impl ServiceContext {
     }
 }
 
-impl Service for ServiceContext {
+impl Service for FsService {
     type ReqBody = Body;
     type ResBody = Body;
     type Error = io::Error;
@@ -97,28 +97,17 @@ impl Service for ServiceContext {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct ServerConfig {
-    pub doc_dir: PathBuf,
-    pub targets: Vec<Target>,
-    pub addr: SocketAddr,
-}
-
-pub fn start(
-    config: ServerConfig,
-    shutdown_signal: impl Future<Item = (), Error = ()> + Send + 'static,
-) -> Fallible<()> {
-    let inner = Arc::new(Inner {
-        doc_dir: config.doc_dir,
-        targets: config.targets,
-    });
+pub fn start<F>(addr: &SocketAddr, config: Arc<ServerConfig>, shutdown_signal: F) -> Fallible<()>
+where
+    F: Future<Item = (), Error = ()> + Send + 'static,
+{
     let new_service = move || {
-        Ok::<_, io::Error>(ServiceContext {
-            inner: inner.clone(),
+        Ok::<_, io::Error>(FsService {
+            config: config.clone(),
         })
     };
 
-    let server = hyper::server::Server::bind(&config.addr)
+    let server = hyper::server::Server::bind(addr)
         .serve(new_service)
         .map_err(|e| error!("server error: {}", e));
     let server = server

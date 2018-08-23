@@ -19,74 +19,85 @@ pub mod server;
 use cargo::core::compiler::CompileMode;
 use cargo::core::Workspace;
 use cargo::ops::Packages;
+use cargo::util::important_paths::find_root_manifest_for_wd;
 use cargo::util::{Config, Filesystem};
 
-use std::sync::mpsc;
+use std::net::SocketAddr;
+use std::sync::{mpsc, Arc};
+use std::time::Duration;
 
 use failure::Fallible;
 use futures::sync::oneshot;
 use futures::{future, Future};
+use notify::{watcher, RecursiveMode, Watcher};
 
-pub fn run(config: &Config, mode: CompileMode, spec: Packages, watch: bool) -> Fallible<()> {
-    let addr = ([127, 0, 0, 1], 8000).into();
+use self::server::ServerConfig;
 
-    let root = cargo::util::important_paths::find_root_manifest_for_wd(config.cwd())?;
-    let workspace = Workspace::new(&root, &config)?;
+#[derive(Debug)]
+pub struct DocserveOptions {
+    pub config: Config,
+    pub mode: CompileMode,
+    pub spec: Packages,
+    pub watch: bool,
+    pub addr: SocketAddr,
+}
+
+pub fn run(opts: DocserveOptions) -> Fallible<()> {
+    let config = &opts.config;
+    let root = find_root_manifest_for_wd(config.cwd())?;
+    let workspace = Workspace::new(&root, &opts.config)?;
+
+    let target_dir = config
+        .target_dir()?
+        .map_or("./target".into(), Filesystem::into_path_unlocked);
+    let doc_dir = target_dir.join("doc");
+
+    let targets = workspace
+        .members()
+        .flat_map(|pkg| {
+            pkg.manifest().targets().iter().filter_map(|t| {
+                if t.documented() && t.is_lib() {
+                    Some(t.clone())
+                } else {
+                    None
+                }
+            })
+        })
+        .collect();
+    let server_config = Arc::new(ServerConfig { doc_dir, targets });
 
     trace!("starting the filesystem notifier");
-    use notify::Watcher;
     let (tx_notify, rx_notify) = mpsc::channel();
-    let mut watcher = notify::watcher(tx_notify, std::time::Duration::from_millis(500))?;
-    watcher.watch(
-        workspace.root().join("src"),
-        notify::RecursiveMode::Recursive,
-    )?;
+    let mut watcher = watcher(tx_notify, Duration::from_millis(500))?;
+    watcher.watch(workspace.root().join("src"), RecursiveMode::Recursive)?;
 
     config
         .shell()
         .status("Docserve", "Generating the documentation")?;
-    doc::generate(&workspace, mode, spec.clone())?;
+    doc::generate(&workspace, opts.mode, opts.spec.clone())?;
 
     loop {
         config.shell().status(
             "Docserve",
-            format!("Starting HTTP server listening on http://{}", addr),
+            format!("Starting HTTP server listening on http://{}", opts.addr),
         )?;
-        let target_dir = workspace
-            .config()
-            .target_dir()?
-            .map_or("./target".into(), Filesystem::into_path_unlocked);
-        let doc_dir = target_dir.join("doc");
-        let targets = workspace
-            .members()
-            .flat_map(|pkg| {
-                pkg.manifest().targets().iter().filter_map(|t| {
-                    if t.documented() && t.is_lib() {
-                        Some(t.clone())
-                    } else {
-                        None
-                    }
-                })
-            })
-            .collect();
-        let server_config = server::ServerConfig {
-            doc_dir,
-            targets,
-            addr,
-        };
 
-        if !watch {
+        if !opts.watch {
             trace!("--> entered in standard mode");
-            server::start(server_config, future::empty())?;
+            server::start(&opts.addr, server_config.clone(), future::empty())?;
             break Ok(());
         }
 
         trace!("--> entered in watch mode");
         let (tx_shutdown, rx_shutdown) = oneshot::channel();
         let (tx_done, rx_done) = oneshot::channel();
-        std::thread::spawn(move || {
-            let _ = server::start(server_config, rx_shutdown.map_err(|_| ()));
-            tx_done.send(()).unwrap();
+        std::thread::spawn({
+            let addr = opts.addr;
+            let server_config = server_config.clone();
+            move || {
+                let _ = server::start(&addr, server_config, rx_shutdown.map_err(|_| ()));
+                tx_done.send(()).unwrap();
+            }
         });
 
         match rx_notify.recv() {
@@ -103,7 +114,7 @@ pub fn run(config: &Config, mode: CompileMode, spec: Packages, watch: bool) -> F
                 config
                     .shell()
                     .status("Docserve", "Regenerating the documentation")?;
-                doc::generate(&workspace, mode, spec.clone())?;
+                doc::generate(&workspace, opts.mode, opts.spec.clone())?;
 
                 continue;
             }
