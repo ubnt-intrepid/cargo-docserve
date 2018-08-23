@@ -9,8 +9,8 @@ extern crate hyper;
 extern crate mime_guess;
 extern crate tokio;
 
-mod doc;
-mod serve;
+pub mod doc;
+pub mod serve;
 
 // ====
 
