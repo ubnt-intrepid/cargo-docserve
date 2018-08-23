@@ -8,7 +8,7 @@ Experimental
 ## Testing
 
 ```shell-session
-$ cargo run docserve -- [options]
+$ cargo run docserve [OPTIONS]
 ```
 
 ## TODOs

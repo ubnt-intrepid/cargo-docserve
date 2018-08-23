@@ -3,7 +3,6 @@
 extern crate cargo;
 extern crate cargo_docserve;
 
-extern crate clap_verbosity_flag;
 extern crate failure;
 #[macro_use]
 extern crate log;
@@ -15,9 +14,7 @@ use cargo::core::compiler::CompileMode;
 use cargo::ops::Packages;
 use cargo::util::Config;
 
-use clap_verbosity_flag::Verbosity;
 use failure::Fallible;
-use log::Level;
 use std::path::PathBuf;
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
@@ -43,22 +40,22 @@ struct CliOptions {
     #[structopt(long = "all")]
     all: bool,
 
-    #[structopt(long = "exclude")]
+    #[structopt(long = "exclude", value_name = "SPEC")]
     exclude: Vec<String>,
 
-    #[structopt(long = "package")]
+    #[structopt(short = "p", long = "package", value_name = "SPEC")]
     package: Vec<String>,
 
     #[structopt(long = "no-deps")]
     no_deps: bool,
 
-    #[structopt(flatten)]
-    verbose: Verbosity,
+    #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
+    verbose: u32,
 
     #[structopt(short = "q", long = "quiet")]
-    quiet: bool,
+    quiet: Option<bool>,
 
-    #[structopt(long = "color")]
+    #[structopt(long = "color", value_name = "WHEN")]
     color: Option<String>,
 
     #[structopt(long = "frozen")]
@@ -67,10 +64,10 @@ struct CliOptions {
     #[structopt(long = "locked")]
     locked: bool,
 
-    #[structopt(long = "target-dir", parse(from_os_str))]
+    #[structopt(long = "target-dir", value_name = "DIRECTORY", parse(from_os_str))]
     target_dir: Option<PathBuf>,
 
-    #[structopt(short = "Z")]
+    #[structopt(short = "Z", value_name = "FLAGS")]
     unstable_flags: Vec<String>,
 }
 
@@ -82,13 +79,6 @@ fn main() -> Fallible<()> {
     };
     debug!("cli options = {:?}", opts);
 
-    let verbosity = match opts.verbose.log_level() {
-        Level::Info => 1,
-        Level::Debug => 2,
-        Level::Trace => 3,
-        _ => 0,
-    };
-
     let mode = CompileMode::Doc {
         deps: !opts.no_deps,
     };
@@ -97,8 +87,8 @@ fn main() -> Fallible<()> {
 
     let mut config = Config::default()?;
     config.configure(
-        verbosity,
-        Some(opts.quiet),
+        opts.verbose,
+        opts.quiet,
         &opts.color,
         opts.frozen,
         opts.locked,

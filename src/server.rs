@@ -1,10 +1,10 @@
 use std::fmt;
 use std::io;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use cargo::core::{Target, Workspace};
-use cargo::util::Filesystem;
+use cargo::core::Target;
 
 use askama::Template;
 use failure::Fallible;
@@ -97,39 +97,35 @@ impl Service for ServiceContext {
     }
 }
 
-pub fn serve(ws: &Workspace) -> Fallible<()> {
-    let target_dir = ws
-        .config()
-        .target_dir()?
-        .map_or("./target".into(), Filesystem::into_path_unlocked);
-    let doc_dir = target_dir.join("doc");
-    let targets = ws
-        .members()
-        .flat_map(|pkg| {
-            pkg.manifest().targets().iter().filter_map(|t| {
-                if t.documented() && t.is_lib() {
-                    Some(t.clone())
-                } else {
-                    None
-                }
-            })
-        })
-        .collect();
-    let inner = Arc::new(Inner { doc_dir, targets });
+#[derive(Debug, Clone)]
+pub struct ServerConfig {
+    pub doc_dir: PathBuf,
+    pub targets: Vec<Target>,
+    pub addr: SocketAddr,
+}
+
+pub fn start(
+    config: ServerConfig,
+    shutdown_signal: impl Future<Item = (), Error = ()> + Send + 'static,
+) -> Fallible<()> {
+    let inner = Arc::new(Inner {
+        doc_dir: config.doc_dir,
+        targets: config.targets,
+    });
     let new_service = move || {
         Ok::<_, io::Error>(ServiceContext {
             inner: inner.clone(),
         })
     };
 
-    let addr = ([127, 0, 0, 1], 8000).into();
-    let server = hyper::server::Server::bind(&addr)
+    let server = hyper::server::Server::bind(&config.addr)
         .serve(new_service)
         .map_err(|e| error!("server error: {}", e));
+    let server = server
+        .select(shutdown_signal)
+        .map(|((), _next)| ())
+        .map_err(|((), _next)| ());
 
-    ws.config()
-        .shell()
-        .status("Docserve", format!("Listening on http://{}", addr))?;
     hyper::rt::run(server);
 
     Ok(())
