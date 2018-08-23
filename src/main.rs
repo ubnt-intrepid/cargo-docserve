@@ -18,7 +18,7 @@ extern crate tokio;
 use askama::Template;
 use cargo::core::compiler::CompileMode;
 use cargo::core::{Target, Workspace};
-use cargo::ops::{CompileOptions, DocOptions};
+use cargo::ops::{CompileOptions, DocOptions, Packages};
 use cargo::util::{Config, Filesystem};
 use clap_verbosity_flag::Verbosity;
 use failure::Fallible;
@@ -37,6 +37,15 @@ use tokio::io::read_to_end;
 #[derive(Debug, StructOpt)]
 #[structopt(name = "cargo-docserve")]
 struct CliOptions {
+    #[structopt(long = "all")]
+    all: bool,
+
+    #[structopt(long = "exclude")]
+    exclude: Vec<String>,
+
+    #[structopt(long = "package")]
+    package: Vec<String>,
+
     #[structopt(long = "no-deps")]
     no_deps: bool,
 
@@ -67,6 +76,7 @@ fn main() -> Fallible<()> {
 
     let opts = CliOptions::from_args();
     debug!("cli options = {:?}", opts);
+
     let verbosity = match opts.verbose.log_level() {
         Level::Info => 1,
         Level::Debug => 2,
@@ -87,7 +97,9 @@ fn main() -> Fallible<()> {
     let mode = CompileMode::Doc {
         deps: !opts.no_deps,
     };
-    let compile_opts = CompileOptions::new(&config, mode)?;
+
+    let mut compile_opts = CompileOptions::new(&config, mode)?;
+    compile_opts.spec = Packages::from_flags(opts.all, opts.exclude.clone(), opts.package.clone())?;
 
     let root = cargo::util::important_paths::find_root_manifest_for_wd(config.cwd())?;
     let workspace = Workspace::new(&root, &config)?;

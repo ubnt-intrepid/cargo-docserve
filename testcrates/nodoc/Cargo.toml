@@ -1,0 +1,11 @@
+[package]
+name = "nodoc"
+version = "0.1.0"
+authors = ["Yusuke Sasaki <yusuke.sasaki.nuem@gmail.com>"]
+
+[lib]
+name = "nodoc"
+path = "src/lib.rs"
+doc = false
+
+[dependencies]

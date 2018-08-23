@@ -9,6 +9,12 @@ repository = "https://github.com/ubnt-intrepid/cargo-docserve.git"
 [badges]
 maintenance = { status = "experimental" }
 
+[workspace]
+members = [
+  "testcrates/normal",
+  "testcrates/nodoc",
+]
+
 [dependencies]
 cargo = "0.29.0"
 clap-verbosity-flag = "0.2.0"

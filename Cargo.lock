@@ -167,7 +167,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-docserve"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "askama 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cargo 0.29.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -886,6 +886,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "nodoc"
+version = "0.1.0"
+
+[[package]]
 name = "nodrop"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -897,6 +901,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "memchr 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "normal"
+version = "0.1.0"
 
 [[package]]
 name = "notify"
