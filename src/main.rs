@@ -30,9 +30,25 @@ use mime_guess::guess_mime_type;
 use std::io;
 use std::path::PathBuf;
 use std::sync::Arc;
+use structopt::clap::AppSettings;
 use structopt::StructOpt;
 use tokio::fs::File;
 use tokio::io::read_to_end;
+
+#[derive(StructOpt)]
+#[structopt(bin_name = "cargo")]
+enum Opts {
+    #[structopt(
+        name = "docserve",
+        raw(
+            setting = "AppSettings::UnifiedHelpMessage",
+            setting = "AppSettings::DeriveDisplayOrder",
+            setting = "AppSettings::DontCollapseArgsInUsage"
+        )
+    )]
+    /// serve API docs
+    Docserve(CliOptions),
+}
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "cargo-docserve")]
@@ -74,7 +90,9 @@ struct CliOptions {
 fn main() -> Fallible<()> {
     pretty_env_logger::try_init()?;
 
-    let opts = CliOptions::from_args();
+    let opts = match Opts::from_args() {
+        Opts::Docserve(opts) => opts,
+    };
     debug!("cli options = {:?}", opts);
 
     let verbosity = match opts.verbose.log_level() {
