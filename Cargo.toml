@@ -16,6 +16,7 @@ members = [
 ]
 
 [dependencies]
+# cargo = { git = "https://github.com/rust-lang/cargo.git", branch = "master" }
 cargo = "0.29.0"
 clap-verbosity-flag = "0.2.0"
 failure = "0.1.2"
