@@ -1,0 +1,2 @@
+/// dummy
+pub fn foo() {}

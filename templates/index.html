@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Index</title>
+</head>
+<body>
+    <ul>
+        {% for target in targets %}
+        <li><a href="/{{ target.crate_name() }}">{{ target.name() }}</a></li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
