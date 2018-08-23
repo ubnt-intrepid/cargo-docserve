@@ -69,6 +69,9 @@ struct CliOptions {
 
     #[structopt(short = "Z", value_name = "FLAGS")]
     unstable_flags: Vec<String>,
+
+    #[structopt(short = "w", long = "watch")]
+    watch: bool,
 }
 
 fn main() -> Fallible<()> {
@@ -96,7 +99,7 @@ fn main() -> Fallible<()> {
         &opts.unstable_flags[..],
     )?;
 
-    cargo_docserve::run(&config, mode, spec)?;
+    cargo_docserve::run(&config, mode, spec, opts.watch)?;
 
     Ok(())
 }

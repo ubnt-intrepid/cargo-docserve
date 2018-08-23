@@ -25,15 +25,15 @@ use std::sync::mpsc;
 
 use failure::Fallible;
 use futures::sync::oneshot;
-use futures::Future;
+use futures::{future, Future};
 
-pub fn run(config: &Config, mode: CompileMode, spec: Packages) -> Fallible<()> {
+pub fn run(config: &Config, mode: CompileMode, spec: Packages, watch: bool) -> Fallible<()> {
+    let addr = ([127, 0, 0, 1], 8000).into();
+
     let root = cargo::util::important_paths::find_root_manifest_for_wd(config.cwd())?;
     let workspace = Workspace::new(&root, &config)?;
 
-    let addr = ([127, 0, 0, 1], 8000).into();
-
-    // start filesystem notifier.
+    trace!("starting the filesystem notifier");
     use notify::Watcher;
     let (tx_notify, rx_notify) = mpsc::channel();
     let mut watcher = notify::watcher(tx_notify, std::time::Duration::from_millis(500))?;
@@ -74,6 +74,14 @@ pub fn run(config: &Config, mode: CompileMode, spec: Packages) -> Fallible<()> {
             targets,
             addr,
         };
+
+        if !watch {
+            trace!("--> entered in standard mode");
+            server::start(server_config, future::empty())?;
+            break Ok(());
+        }
+
+        trace!("--> entered in watch mode");
         let (tx_shutdown, rx_shutdown) = oneshot::channel();
         let (tx_done, rx_done) = oneshot::channel();
         std::thread::spawn(move || {
