@@ -108,6 +108,7 @@ where
     };
 
     let server = hyper::server::Server::bind(addr)
+        .http1_keepalive(false)
         .serve(new_service)
         .map_err(|e| error!("server error: {}", e));
     let server = server
