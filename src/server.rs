@@ -99,7 +99,7 @@ impl Service for FsService {
 
 pub fn start<F>(addr: &SocketAddr, config: Arc<ServerConfig>, shutdown_signal: F) -> Fallible<()>
 where
-    F: Future<Item = (), Error = ()> + Send + 'static,
+    F: Future<Item = ()> + Send + 'static,
 {
     let new_service = move || {
         Ok::<_, io::Error>(FsService {
@@ -108,13 +108,9 @@ where
     };
 
     let server = hyper::server::Server::bind(addr)
-        .http1_keepalive(false)
         .serve(new_service)
+        .with_graceful_shutdown(shutdown_signal)
         .map_err(|e| error!("server error: {}", e));
-    let server = server
-        .select(shutdown_signal)
-        .map(|((), _next)| ())
-        .map_err(|((), _next)| ());
 
     hyper::rt::run(server);
 

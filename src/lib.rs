@@ -84,7 +84,7 @@ pub fn run(opts: DocserveOptions) -> Fallible<()> {
 
         if !opts.watch {
             trace!("--> entered in standard mode");
-            server::start(&opts.addr, server_config.clone(), future::empty())?;
+            server::start(&opts.addr, server_config.clone(), future::empty::<(), ()>())?;
             break Ok(());
         }
 
@@ -95,7 +95,7 @@ pub fn run(opts: DocserveOptions) -> Fallible<()> {
             let addr = opts.addr;
             let server_config = server_config.clone();
             move || {
-                let _ = server::start(&addr, server_config, rx_shutdown.map_err(|_| ()));
+                let _ = server::start(&addr, server_config, rx_shutdown);
                 tx_done.send(()).unwrap();
             }
         });
