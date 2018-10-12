@@ -16,16 +16,14 @@ members = [
 ]
 
 [dependencies]
-# cargo = { git = "https://github.com/rust-lang/cargo.git", branch = "master" }
-cargo = "0.29.0"
+cargo = "0.30.0"
 clap-verbosity-flag = "0.2.0"
 failure = "0.1.2"
 log = "0.4.4"
 notify = "4.0.4"
 pretty_env_logger = "0.2.4"
 structopt = "0.2.10"
-hyper = { git = "https://github.com/hyperium/hyper.git" }
-# hyper = "0.12.9"
+hyper = "0.12.11"
 http = "0.1.10"
 futures = "0.1.23"
 tokio = "0.1.7"
